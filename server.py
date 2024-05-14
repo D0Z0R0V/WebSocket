@@ -24,7 +24,7 @@ def client_handler(client_socket):
 
 # Конфигурация сервера
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind(('localhost', 12345))
+server_socket.bind(('192.168.122.241', 12345))
 server_socket.listen(5)
 
 clients = []

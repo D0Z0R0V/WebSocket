@@ -38,7 +38,7 @@ text.pack(pady=10)
 
 # Подключение к серверу
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(('localhost', 12345))
+client_socket.connect(('192.168.122.241', 12345))
 start_client()
 
 # Запуск главного цикла обработки событий
