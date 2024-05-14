@@ -1,8 +1,8 @@
-import socket
 import threading
+import socket
 import ssl
 
-# обработка подключений клиентов
+# Обработка подключений клиентов
 def client_handler(client_socket):
     while True:
         try:
@@ -23,11 +23,11 @@ def client_handler(client_socket):
     clients.remove(client_socket)
     client_socket.close()
 
-# SSL 
+# Загрузка сертификата для SSL
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 context.load_cert_chain(certfile="server.crt", keyfile="server.key")
 
-# Конфиг сервера
+# Конфигурация сервера
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind(('localhost', 12345))
 server_socket.listen(5)
@@ -37,10 +37,28 @@ clients = []
 
 print("Сервер запущен. Просушивание порта 12345")
 
+# Функция для запуска сервера
+def start_server():
+    while True:
+        client_socket, client_address = server_socket.accept()
+        print(f"Подключение от {client_address} установлено.")
+        clients.append(client_socket)
+        # Канал связи с клиентом
+        thread = threading.Thread(target=client_handler, args=(client_socket,))
+        thread.start()
+
+# Функция для остановки сервера
+def stop_server():
+    server_socket.close()
+    print("Сервер остановлен.")
+
+# Основной цикл программы
 while True:
-    client_socket, client_address = server_socket.accept()
-    print(f"Connection from {client_address} established.")
-    clients.append(client_socket)
-    # канал связи с клиентом
-    thread = threading.Thread(target=client_handler, args=(client_socket,))
-    thread.start()
+    command = input("Введите команду (start/stop): ").strip().lower()
+    if command == "start":
+        start_server()
+    elif command == "stop":
+        stop_server()
+        break
+    else:
+        print("Неверная команда. Попробуйте снова.")
