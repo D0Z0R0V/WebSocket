@@ -1,6 +1,5 @@
 import threading
 import socket
-import ssl
 
 # Обработка подключений клиентов
 def client_handler(client_socket):
@@ -23,15 +22,10 @@ def client_handler(client_socket):
     clients.remove(client_socket)
     client_socket.close()
 
-# Загрузка сертификата для SSL
-context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain(certfile="server.crt", keyfile="server.key")
-
 # Конфигурация сервера
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind(('localhost', 12345))
 server_socket.listen(5)
-server_socket = context.wrap_socket(server_socket, server_side=True)
 
 clients = []
 
