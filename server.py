@@ -1,27 +1,58 @@
 import threading
 import socket
+import sqlite3
+import bcrypt
+import os
 
-# Обработка подключений клиентов
+# Инициализация базы данных
+def init_db():
+    conn = sqlite3.connect('chat.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user TEXT,
+                        message TEXT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT UNIQUE,
+                        password TEXT)''')
+    conn.commit()
+    conn.close()
+
 def client_handler(client_socket, client_address):
+    authenticated = False
+    username = None
     while True:
         try:
             data = client_socket.recv(1024)
             if not data:
                 break
             message = data.decode('utf-8')
-            if message.startswith("file|"):
-                file_name = message.split("|")[1]
-                # Обработка отправки файла
-                # Добавьте код для сохранения файла или его передачи другому клиенту
-            else:
-                print(f"Получено сообщение от {client_address}: {message}")
-                # Если сообщение начинается с '@', отправляем его конкретному клиенту
-                if message.startswith("@"):
-                    recipient = message.split()[0][1:]
-                    message_text = " ".join(message.split()[1:])
-                    send_direct_message(recipient, message_text, client_socket)
+            if not authenticated:
+                if message.startswith("register|"):
+                    username, password = message.split('|')[1:]
+                    if register_user(username, password):
+                        client_socket.send("REGISTER_SUCCESS".encode('utf-8'))
+                    else:
+                        client_socket.send("REGISTER_FAIL".encode('utf-8'))
                 else:
-                    broadcast_message(message, client_socket)
+                    username, password = message.split('|')
+                    if authenticate_user(username, password):
+                        authenticated = True
+                        client_socket.send("AUTH_SUCCESS".encode('utf-8'))
+                    else:
+                        client_socket.send("AUTH_FAIL".encode('utf-8'))
+                        break
+            else:
+                if message.startswith("file|"):
+                    file_name = message.split("|")[1]
+                    file_size = int(message.split("|")[2])
+                    receive_file(client_socket, file_name, file_size)
+                else:
+                    print(f"Получено сообщение от {client_address}: {message}")
+                    save_message(username, message)
+                    broadcast_message(f"{username}: {message}", client_socket)
         except ConnectionResetError:
             break
         except Exception as e:
@@ -30,28 +61,52 @@ def client_handler(client_socket, client_address):
     clients.remove((client_socket, client_address))
     client_socket.close()
 
-# Отправка сообщения всем клиентам, кроме отправителя
 def broadcast_message(message, sender_socket):
     for client, address in clients:
         if client != sender_socket:
             client.send(message.encode('utf-8'))
 
-# Отправка приватного сообщения конкретному клиенту
-def send_direct_message(recipient, message, sender_socket):
-    for client, address in clients:
-        if address[1] == recipient:
-            client.send(message.encode('utf-8'))
-            return
-    sender_socket.send(f"Клиент с именем '{recipient}' не найден".encode('utf-8'))
+def save_message(user, message):
+    conn = sqlite3.connect('chat.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO messages (user, message) VALUES (?, ?)", (user, message))
+    conn.commit()
+    conn.close()
 
-# Получение списка подключенных клиентов с их IP-адресами и именами
-def get_clients_list():
-    clients_list = "Список подключенных клиентов:\n"
-    for _, address in clients:
-        clients_list += f"{address[1]}: {address[0]}\n"
-    return clients_list
+def authenticate_user(username, password):
+    conn = sqlite3.connect('chat.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    conn.close()
+    if result and bcrypt.checkpw(password.encode('utf-8'), result[0]):
+        return True
+    return False
 
-# Конфигурация сервера
+def register_user(username, password):
+    conn = sqlite3.connect('chat.db')
+    cursor = conn.cursor()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    try:
+        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def receive_file(client_socket, file_name, file_size):
+    with open(file_name, 'wb') as f:
+        data = client_socket.recv(1024)
+        total_received = len(data)
+        f.write(data)
+        while total_received < file_size:
+            data = client_socket.recv(1024)
+            total_received += len(data)
+            f.write(data)
+        print(f"Файл {file_name} получен")
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind(('192.168.122.241', 12345))
 server_socket.listen(5)
@@ -60,18 +115,16 @@ clients = []
 
 print("Сервер запущен. Прослушивание порта 12345")
 
-# Функция для запуска сервера
+init_db()
+
 def start_server():
     while True:
         client_socket, client_address = server_socket.accept()
         print(f"Подключение от {client_address} установлено.")
         clients.append((client_socket, client_address))
-        client_socket.send(get_clients_list().encode('utf-8'))
-        # Канал связи с клиентом
         thread = threading.Thread(target=client_handler, args=(client_socket, client_address))
         thread.start()
 
-# Основной цикл программы
 while True:
     command = input("Введите команду (start/stop): ").strip().lower()
     if command == "start":
