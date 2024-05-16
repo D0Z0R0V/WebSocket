@@ -31,19 +31,29 @@ def client_handler(client_socket, client_address):
             message = data.decode('utf-8')
             if not authenticated:
                 if message.startswith("register|"):
-                    username, password = message.split('|')[1:]
-                    if register_user(username, password):
-                        client_socket.send("REGISTER_SUCCESS".encode('utf-8'))
+                    parts = message.split('|')
+                    if len(parts) == 3:
+                        username = parts[1]
+                        password = parts[2]
+                        if register_user(username, password):
+                            client_socket.send("REGISTER_SUCCESS".encode('utf-8'))
+                        else:
+                            client_socket.send("REGISTER_FAIL".encode('utf-8'))
                     else:
                         client_socket.send("REGISTER_FAIL".encode('utf-8'))
                 else:
-                    username, password = message.split('|')
-                    if authenticate_user(username, password):
-                        authenticated = True
-                        client_socket.send("AUTH_SUCCESS".encode('utf-8'))
+                    parts = message.split('|')
+                    if len(parts) == 2:
+                        username = parts[0]
+                        password = parts[1]
+                        if authenticate_user(username, password):
+                            authenticated = True
+                            client_socket.send("AUTH_SUCCESS".encode('utf-8'))
+                        else:
+                            client_socket.send("AUTH_FAIL".encode('utf-8'))
                     else:
                         client_socket.send("AUTH_FAIL".encode('utf-8'))
-                        break
+                    break
             else:
                 if message.startswith("file|"):
                     file_name = message.split("|")[1]

@@ -4,8 +4,6 @@ from tkinter import filedialog, messagebox
 import socket
 import threading
 import os
-import bcrypt
-import sqlite3
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 мегабайт
 
@@ -41,7 +39,7 @@ def receive_message():
         text.insert(tk.END, received_message + '\n')
 
 def authenticate(username, password):
-    client_socket.sendall(f"{username}|{password}".encode())
+    client_socket.sendall(f"{username}|{password}".encode('utf-8'))
     response = client_socket.recv(1024).decode()
     if response == "AUTH_SUCCESS":
         return True
@@ -49,7 +47,7 @@ def authenticate(username, password):
         return False
 
 def register_user(username, password):
-    client_socket.sendall(f"register|{username}|{password}".encode())
+    client_socket.sendall(f"register|{username}|{password}".encode('utf-8'))
     response = client_socket.recv(1024).decode()
     if response == "REGISTER_SUCCESS":
         return True
