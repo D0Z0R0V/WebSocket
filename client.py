@@ -9,8 +9,9 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 мегабайт
 
 def send_message():
     message = entry.get()
+    selected_client = selected_client_var.get()
     if message:
-        client_socket.sendall(message.encode())
+        client_socket.sendall(f"@{selected_client} {message}".encode())
         entry.delete(0, tk.END)
 
 def send_file():
@@ -19,7 +20,8 @@ def send_file():
         file_name = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
         if file_size <= MAX_FILE_SIZE:
-            client_socket.sendall(f"file|{file_name}|{file_size}".encode())
+            selected_client = selected_client_var.get()
+            client_socket.sendall(f"file|{selected_client}|{file_name}|{file_size}".encode())
             with open(file_path, 'rb') as f:
                 while True:
                     data = f.read(1024)
@@ -91,6 +93,13 @@ file_button.pack(pady=5)
 
 text = tk.Text(root, width=50, height=20)
 text.pack(pady=10)
+
+# Создание выпадающего списка клиентов
+clients = ["Client 1", "Client 2", "Client 3"]  # Замените на ваш список подключенных клиентов
+selected_client_var = tk.StringVar(root)
+selected_client_var.set(clients[0])  # Устанавливаем первого клиента по умолчанию
+client_menu = ttk.OptionMenu(root, selected_client_var, *clients)
+client_menu.pack()
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect(('192.168.122.241', 12345))
