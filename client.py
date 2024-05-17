@@ -1,6 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
-from tkinter import filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox
 import socket
 import threading
 import os
@@ -11,8 +10,12 @@ def send_message():
     message = entry.get()
     selected_client = selected_client_var.get()
     if message:
-        client_socket.sendall(f"@{selected_client} {message}".encode())
-        entry.delete(0, tk.END)
+        try:
+            client_socket.sendall(f"@{selected_client} {message}".encode())
+            entry.delete(0, tk.END)
+        except Exception as e:
+            print(f"Ошибка при отправке сообщения: {e}")
+            messagebox.showerror("Ошибка", "Ошибка при отправке сообщения")
 
 def send_file():
     file_path = filedialog.askopenfilename()
@@ -21,66 +24,90 @@ def send_file():
         file_size = os.path.getsize(file_path)
         if file_size <= MAX_FILE_SIZE:
             selected_client = selected_client_var.get()
-            client_socket.sendall(f"file|{selected_client}|{file_name}|{file_size}".encode())
-            with open(file_path, 'rb') as f:
-                while True:
-                    data = f.read(1024)
-                    if not data:
-                        break
-                    client_socket.sendall(data)
-            text.insert(tk.END, f"Файл {file_name} отправлен\n")
+            try:
+                client_socket.sendall(f"file|{selected_client}|{file_name}|{file_size}".encode())
+                with open(file_path, 'rb') as f:
+                    while True:
+                        data = f.read(1024)
+                        if not data:
+                            break
+                        client_socket.sendall(data)
+                text.insert(tk.END, f"Файл {file_name} отправлен\n")
+            except Exception as e:
+                print(f"Ошибка при отправке файла: {e}")
+                messagebox.showerror("Ошибка", "Ошибка при отправке файла")
         else:
             text.insert(tk.END, "Файл слишком большой для отправки\n")
 
 def receive_message():
     while True:
-        data = client_socket.recv(1024)
-        if not data:
+        try:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+            received_message = data.decode()
+            if received_message.startswith("@clients_list|"):
+                clients = received_message.split("|")[1:]
+                update_clients_menu(clients)
+            else:
+                text.insert(tk.END, received_message + '\n')
+        except Exception as e:
+            print(f"Ошибка при приеме сообщения: {e}")
             break
-        received_message = data.decode()
-        text.insert(tk.END, received_message + '\n')
 
-def authenticate(username, password):
-    client_socket.sendall(f"{username}|{password}".encode('utf-8'))
-    response = client_socket.recv(1024).decode()
-    if response == "AUTH_SUCCESS":
-        return True
-    else:
-        return False
+def update_clients_menu(clients):
+    client_menu['menu'].delete(0, 'end')
+    for client in clients:
+        client_menu['menu'].add_command(label=client, command=lambda c=client: selected_client_var.set(c))
 
-def register_user(username, password):
-    client_socket.sendall(f"register|{username}|{password}".encode('utf-8'))
-    response = client_socket.recv(1024).decode()
-    if response == "REGISTER_SUCCESS":
-        return True
-    else:
-        return False
+def authenticate():
+    username = username_entry.get()
+    password = password_entry.get()
+    try:
+        client_socket.sendall(f"{username}|{password}".encode())
+    except Exception as e:
+        print(f"Ошибка при отправке данных для аутентификации: {e}")
+        messagebox.showerror("Ошибка", "Ошибка при отправке данных для аутентификации")
 
-def show_register_window():
-    register_window = tk.Toplevel(root)
-    register_window.title("Регистрация")
+def register():
+    username = username_entry.get()
+    password = password_entry.get()
+    try:
+        client_socket.sendall(f"register|{username}|{password}".encode())
+    except Exception as e:
+        print(f"Ошибка при отправке данных для регистрации: {e}")
+        messagebox.showerror("Ошибка", "Ошибка при отправке данных для регистрации")
 
-    tk.Label(register_window, text="Имя пользователя").pack(pady=5)
-    reg_username_entry = tk.Entry(register_window)
-    reg_username_entry.pack(pady=5)
-
-    tk.Label(register_window, text="Пароль").pack(pady=5)
-    reg_password_entry = tk.Entry(register_window, show='*')
-    reg_password_entry.pack(pady=5)
-
-    def attempt_register():
-        reg_username = reg_username_entry.get()
-        reg_password = reg_password_entry.get()
-        if register_user(reg_username, reg_password):
-            register_window.destroy()
-            messagebox.showinfo("Успех", "Регистрация прошла успешно")
-        else:
-            messagebox.showerror("Ошибка", "Ошибка регистрации")
-
-    tk.Button(register_window, text="Зарегистрироваться", command=attempt_register).pack(pady=10)
+def on_closing():
+    try:
+        client_socket.close()
+    except Exception as e:
+        print(f"Ошибка при закрытии сокета: {e}")
+    root.destroy()
 
 root = tk.Tk()
 root.title("Chat Client")
+
+login_frame = ttk.Frame(root)
+login_frame.pack(pady=10)
+
+username_label = ttk.Label(login_frame, text="Логин:")
+username_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
+
+username_entry = ttk.Entry(login_frame, width=30)
+username_entry.grid(row=0, column=1, padx=5, pady=5)
+
+password_label = ttk.Label(login_frame, text="Пароль:")
+password_label.grid(row=1, column=0, padx=5, pady=5, sticky="e")
+
+password_entry = ttk.Entry(login_frame, width=30, show="*")
+password_entry.grid(row=1, column=1, padx=5, pady=5)
+
+login_button = ttk.Button(login_frame, text="Войти", command=authenticate)
+login_button.grid(row=2, column=1, pady=5)
+
+register_button = ttk.Button(login_frame, text="Зарегистрироваться", command=register)
+register_button.grid(row=2, column=0, pady=5)
 
 entry = ttk.Entry(root, width=50)
 entry.pack(pady=10)
@@ -94,40 +121,17 @@ file_button.pack(pady=5)
 text = tk.Text(root, width=50, height=20)
 text.pack(pady=10)
 
-# Создание выпадающего списка клиентов
-clients = ["Client 1", "Client 2", "Client 3"]  # Замените на ваш список подключенных клиентов
+clients = []
 selected_client_var = tk.StringVar(root)
-selected_client_var.set(clients[0])  # Устанавливаем первого клиента по умолчанию
-client_menu = ttk.OptionMenu(root, selected_client_var, *clients)
+
+client_menu = ttk.OptionMenu(root, selected_client_var, "Выберите клиента", *clients)
 client_menu.pack()
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(('192.168.122.241', 12345))
+client_socket.connect(('51.250.55.146', 12345))
 
-login_window = tk.Toplevel(root)
-login_window.title("Вход")
+receive_thread = threading.Thread(target=receive_message)
+receive_thread.start()
 
-tk.Label(login_window, text="Имя пользователя").pack(pady=5)
-username_entry = tk.Entry(login_window)
-username_entry.pack(pady=5)
-
-tk.Label(login_window, text="Пароль").pack(pady=5)
-password_entry = tk.Entry(login_window, show='*')
-password_entry.pack(pady=5)
-
-def attempt_login():
-    username = username_entry.get()
-    password = password_entry.get()
-    if authenticate(username, password):
-        login_window.destroy()
-        receive_thread = threading.Thread(target=receive_message)
-        receive_thread.start()
-    else:
-        messagebox.showerror("Ошибка", "Ошибка аутентификации")
-
-tk.Button(login_window, text="Войти", command=attempt_login).pack(pady=10)
-tk.Button(login_window, text="Зарегистрироваться", command=show_register_window).pack(pady=5)
-
+root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()
-
-client_socket.close()

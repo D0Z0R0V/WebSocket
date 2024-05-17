@@ -4,7 +4,6 @@ import sqlite3
 import bcrypt
 import os
 
-# Инициализация базы данных
 def init_db():
     conn = sqlite3.connect('chat.db')
     cursor = conn.cursor()
@@ -55,7 +54,9 @@ def client_handler(client_socket, client_address):
                         client_socket.send("AUTH_FAIL".encode('utf-8'))
                     break
             else:
-                if message.startswith("file|"):
+                if message.startswith("@request_clients_list"):
+                    send_clients_list(client_socket)
+                elif message.startswith("file|"):
                     file_name = message.split("|")[1]
                     file_size = int(message.split("|")[2])
                     receive_file(client_socket, file_name, file_size)
@@ -117,8 +118,15 @@ def receive_file(client_socket, file_name, file_size):
             f.write(data)
         print(f"Файл {file_name} получен")
 
+def send_clients_list(client_socket):
+    clients_list = [address[0] for _, address in clients]
+    try:
+        client_socket.sendall(f"@clients_list|{'|'.join(clients_list)}".encode())
+    except Exception as e:
+        print(f"Ошибка при отправке списка клиентов: {e}")
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind(('192.168.122.241', 12345))
+server_socket.bind(('10.128.0.17', 12345))
 server_socket.listen(5)
 
 clients = []
