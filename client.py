@@ -56,15 +56,28 @@ def receive_message():
             break
 
 def update_clients_menu(clients):
-    client_menu['menu'].delete(0, 'end')
+    menu = client_menu['menu']
+    menu.delete(0, 'end')
     for client in clients:
-        client_menu['menu'].add_command(label=client, command=lambda c=client: selected_client_var.set(c))
+        menu.add_command(label=client, command=lambda c=client: selected_client_var.set(c))
+
+def request_clients_list():
+    try:
+        client_socket.sendall("@request_clients_list".encode())
+    except Exception as e:
+        print(f"Ошибка при запросе списка клиентов: {e}")
 
 def authenticate():
     username = username_entry.get()
     password = password_entry.get()
     try:
         client_socket.sendall(f"{username}|{password}".encode())
+        response = client_socket.recv(1024).decode()
+        if response == "AUTH_SUCCESS":
+            messagebox.showinfo("Успех", "Аутентификация прошла успешно")
+            request_clients_list()
+        else:
+            messagebox.showerror("Ошибка", "Неверный логин или пароль")
     except Exception as e:
         print(f"Ошибка при отправке данных для аутентификации: {e}")
         messagebox.showerror("Ошибка", "Ошибка при отправке данных для аутентификации")
@@ -74,6 +87,11 @@ def register():
     password = password_entry.get()
     try:
         client_socket.sendall(f"register|{username}|{password}".encode())
+        response = client_socket.recv(1024).decode()
+        if response == "REGISTER_SUCCESS":
+            messagebox.showinfo("Успех", "Регистрация прошла успешно")
+        else:
+            messagebox.showerror("Ошибка", "Ошибка при регистрации")
     except Exception as e:
         print(f"Ошибка при отправке данных для регистрации: {e}")
         messagebox.showerror("Ошибка", "Ошибка при отправке данных для регистрации")
