@@ -52,13 +52,13 @@ def client_handler(client_socket, client_address):
                             client_socket.send("AUTH_FAIL".encode('utf-8'))
                     else:
                         client_socket.send("AUTH_FAIL".encode('utf-8'))
-                    break
             else:
                 if message.startswith("@request_clients_list"):
                     send_clients_list(client_socket)
                 elif message.startswith("file|"):
-                    file_name = message.split("|")[1]
-                    file_size = int(message.split("|")[2])
+                    parts = message.split("|")
+                    file_name = parts[2]
+                    file_size = int(parts[3])
                     receive_file(client_socket, file_name, file_size)
                 else:
                     print(f"Получено сообщение от {client_address}: {message}")

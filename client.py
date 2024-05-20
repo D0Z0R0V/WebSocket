@@ -128,7 +128,7 @@ client_menu = ttk.OptionMenu(root, selected_client_var, "Выберите кли
 client_menu.pack()
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(('51.250.55.146', 12345))
+client_socket.connect(('51.250.48.26', 12345))
 
 receive_thread = threading.Thread(target=receive_message)
 receive_thread.start()
